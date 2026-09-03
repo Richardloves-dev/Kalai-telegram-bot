@@ -1,0 +1,17 @@
+{
+  "name": "kalai-telegram-bot",
+  "version": "1.0.0",
+  "description": "Kalai Pet Shop — Telegram new-order notification backend",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
