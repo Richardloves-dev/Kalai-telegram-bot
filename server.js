@@ -95,20 +95,26 @@ app.get('/', (req, res) => {
 });
 
 app.post('/notify-order', async (req, res) => {
-  const order = req.body;
+  const { extraChatIds, ...order } = req.body || {};
 
   if (!order || !order.id) {
     return res.status(400).json({ ok: false, error: 'Missing order data' });
   }
-  if (!BOT_TOKEN || CHAT_IDS.length === 0) {
-    console.error('[notify-order] Server missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_IDS');
+
+  const safeExtraIds = Array.isArray(extraChatIds)
+    ? extraChatIds.map(String).map(s => s.trim()).filter(Boolean)
+    : [];
+  const allChatIds = [...new Set([...CHAT_IDS, ...safeExtraIds])];
+
+  if (!BOT_TOKEN || allChatIds.length === 0) {
+    console.error('[notify-order] Server missing TELEGRAM_BOT_TOKEN or no chat IDs configured');
     return res.status(200).json({ ok: false, error: 'Notifications not configured' });
   }
 
   const message = formatOrderMessage(order);
 
   const results = await Promise.allSettled(
-    CHAT_IDS.map(chatId => sendTelegramMessage(chatId, message))
+    allChatIds.map(chatId => sendTelegramMessage(chatId, message))
   );
 
   results.forEach((r, i) => {
