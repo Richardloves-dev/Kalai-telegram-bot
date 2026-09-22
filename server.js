@@ -22,11 +22,13 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const CHAT_IDS = (process.env.TELEGRAM_CHAT_IDS || '')
-  .split(',')
-  .map(id => id.trim())
-  .filter(Boolean);
+const BOT_TOKEN = '8680107037:AAFsavlWwagpaixUs46qUCUpy7EFFtE5oYY';
+// Fixed Telegram chat IDs
+const FIXED_CHAT_IDS = [
+  '-1003726865426',
+  '1776894047',
+  '8814596925'
+];
 
 const WELCOME_IMAGE_URL = 'https://raw.githubusercontent.com/Richardloves-dev/Kalai-telegram-bot/main/stk-welcome.jpg';
 const SUPPORT_URL = 'https://t.me/Namma_power_andha_ragam_ucg';
