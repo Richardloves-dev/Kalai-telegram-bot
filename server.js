@@ -28,10 +28,10 @@ const CHAT_IDS = (process.env.TELEGRAM_CHAT_IDS || '')
   .map(id => id.trim())
   .filter(Boolean);
 
-const WELCOME_IMAGE_URL = process.env.TELEGRAM_WELCOME_IMAGE_URL || '';
-const SUPPORT_URL = process.env.TELEGRAM_SUPPORT_URL || 'https://t.me/';
-const DEVELOPER_URL = process.env.TELEGRAM_DEVELOPER_URL || 'https://t.me/';
-const WEBSITE_URL = process.env.TELEGRAM_WEBSITE_URL || 'https://example.com';
+const WELCOME_IMAGE_URL = 'https://raw.githubusercontent.com/Richardloves-dev/Kalai-telegram-bot/main/stk-welcome.jpg';
+const SUPPORT_URL = 'https://t.me/Namma_power_andha_ragam_ucg';
+const DEVELOPER_URL = 'https://t.me/Riohari_Loves_Log';
+const WEBSITE_URL = 'https://stkpetshop@gmail.vercel.app';
 
 if (!BOT_TOKEN || CHAT_IDS.length === 0) {
   console.warn('[startup] TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_IDS is missing. Set them in Render → Environment.');
