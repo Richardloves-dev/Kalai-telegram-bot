@@ -1,13 +1,18 @@
 /* ==========================================================================
-   Kalai Pet Shop — Telegram New Order Notification Backend
+   STK Pet Shop — Telegram Backend
    --------------------------------------------------------------------------
-   ONE job only: receive a new order from the website and send a formatted
-   message to every Telegram chat ID listed in TELEGRAM_CHAT_IDS.
+   TWO jobs:
+   1) POST /notify-order   — sends a new-order message to configured chats
+   2) POST /telegram-webhook — replies to customers who message the bot
+      (currently handles /start with a themed welcome photo + buttons)
 
-   Environment variables (set these in Railway, never in code):
-     TELEGRAM_BOT_TOKEN   -> the token BotFather gave you
-     TELEGRAM_CHAT_IDS    -> comma-separated chat IDs, e.g. "-1001234567890,987654321"
-                              (group chat id + your personal chat id)
+   Environment variables (set these in Render, never in code):
+     TELEGRAM_BOT_TOKEN        -> the token BotFather gave you
+     TELEGRAM_CHAT_IDS         -> comma-separated admin chat IDs for orders
+     TELEGRAM_WELCOME_IMAGE_URL -> a hosted image URL for the /start photo
+     TELEGRAM_SUPPORT_URL      -> link for the "Support" button
+     TELEGRAM_DEVELOPER_URL    -> link for the "Developer" button
+     TELEGRAM_WEBSITE_URL      -> your live site URL, for the website button
    ========================================================================== */
 
 const express = require('express');
@@ -23,8 +28,13 @@ const CHAT_IDS = (process.env.TELEGRAM_CHAT_IDS || '')
   .map(id => id.trim())
   .filter(Boolean);
 
+const WELCOME_IMAGE_URL = process.env.TELEGRAM_WELCOME_IMAGE_URL || '';
+const SUPPORT_URL = process.env.TELEGRAM_SUPPORT_URL || 'https://t.me/';
+const DEVELOPER_URL = process.env.TELEGRAM_DEVELOPER_URL || 'https://t.me/';
+const WEBSITE_URL = process.env.TELEGRAM_WEBSITE_URL || 'https://example.com';
+
 if (!BOT_TOKEN || CHAT_IDS.length === 0) {
-  console.warn('[startup] TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_IDS is missing. Set them in Railway → Variables.');
+  console.warn('[startup] TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_IDS is missing. Set them in Render → Environment.');
 }
 
 function escapeHtml(str) {
@@ -33,6 +43,10 @@ function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
+
+/* ==========================================================================
+   1) NEW ORDER NOTIFICATION
+   ========================================================================== */
 
 function formatOrderMessage(order) {
   const customer = order.customer || {};
@@ -77,11 +91,7 @@ async function sendTelegramMessage(chatId, text) {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: 'HTML'
-    })
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' })
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.ok === false) {
@@ -89,10 +99,6 @@ async function sendTelegramMessage(chatId, text) {
   }
   return data;
 }
-
-app.get('/', (req, res) => {
-  res.send('Kalai Pet Shop Telegram notifier is running.');
-});
 
 app.post('/notify-order', async (req, res) => {
   const { extraChatIds, ...order } = req.body || {};
@@ -112,14 +118,10 @@ app.post('/notify-order', async (req, res) => {
   }
 
   const message = formatOrderMessage(order);
-
-  const results = await Promise.allSettled(
-    allChatIds.map(chatId => sendTelegramMessage(chatId, message))
-  );
-
+  const results = await Promise.allSettled(allChatIds.map(chatId => sendTelegramMessage(chatId, message)));
   results.forEach((r, i) => {
     if (r.status === 'rejected') {
-      console.error(`[notify-order] Failed to notify chat ${CHAT_IDS[i]}:`, r.reason?.message || r.reason);
+      console.error(`[notify-order] Failed to notify chat ${allChatIds[i]}:`, r.reason?.message || r.reason);
     }
   });
 
@@ -127,7 +129,76 @@ app.post('/notify-order', async (req, res) => {
   res.status(200).json({ ok: anySucceeded });
 });
 
+/* ==========================================================================
+   2) TELEGRAM WEBHOOK — replies to customers who message the bot
+   ========================================================================== */
+
+function buildWelcomeCaption(firstName, lastName) {
+  const name = [firstName, lastName].filter(Boolean).join(' ');
+  return [
+    `ʜᴇʏ ${escapeHtml(name)}`,
+    `๏ ᴛʜɪs ɪs ˹Sᴛᴋ ✘ 𑊦ᴜᴘᴘᴏʀᴛ˼ 🎀!`,
+    ``,
+    `➻ ᴀ ғᴀsᴛ sᴜᴘᴘᴏʀᴛ ʙᴏᴛ ғᴏʀ sʜᴏᴘ ʙᴜsɪɴᴇss ᴜsᴇ.`
+  ].join('\n');
+}
+
+const WELCOME_KEYBOARD = {
+  inline_keyboard: [
+    [
+      { text: '✨ Support ✨', url: SUPPORT_URL },
+      { text: '🥀 Developer 🥀', url: DEVELOPER_URL }
+    ],
+    [
+      { text: '🛒 STK Pet shop (website)', url: WEBSITE_URL }
+    ]
+  ]
+};
+
+async function sendWelcomePhoto(chatId, firstName, lastName) {
+  const caption = buildWelcomeCaption(firstName, lastName);
+  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      photo: WELCOME_IMAGE_URL,
+      caption,
+      reply_markup: WELCOME_KEYBOARD
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.ok === false) {
+    console.error('[webhook] sendPhoto failed:', data.description || res.status);
+  }
+}
+
+app.post('/telegram-webhook', async (req, res) => {
+  // Acknowledge Telegram immediately — Telegram retries if we're slow/silent.
+  res.sendStatus(200);
+
+  try {
+    const update = req.body;
+    const msg = update?.message;
+    if (!msg || !msg.text) return;
+
+    if (msg.text.startsWith('/start')) {
+      const chatId = msg.chat.id;
+      const firstName = msg.from?.first_name || '';
+      const lastName = msg.from?.last_name || '';
+      await sendWelcomePhoto(chatId, firstName, lastName);
+    }
+  } catch (err) {
+    console.error('[telegram-webhook] error:', err.message || err);
+  }
+});
+
+app.get('/', (req, res) => {
+  res.send('STK Pet Shop Telegram backend is running.');
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Kalai Pet Shop Telegram notifier listening on port ${PORT}`);
+  console.log(`STK Pet Shop Telegram backend listening on port ${PORT}`);
 });
