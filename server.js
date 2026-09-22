@@ -22,18 +22,16 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
-const BOT_TOKEN = '8680107037:AAFsavlWwagpaixUs46qUCUpy7EFFtE5oYY';
-// Fixed Telegram chat IDs
-const CHAT_IDS = [
-  '-1003726865426',
-  '1776894047',
-  '8814596925'
-];
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const CHAT_IDS = (process.env.TELEGRAM_CHAT_IDS || '')
+  .split(',')
+  .map(id => id.trim())
+  .filter(Boolean);
 
-const WELCOME_IMAGE_URL = 'https://raw.githubusercontent.com/Richardloves-dev/Kalai-telegram-bot/main/stk-welcome.jpg';
-const SUPPORT_URL = 'https://t.me/Namma_power_andha_ragam_ucg';
-const DEVELOPER_URL = 'https://t.me/Riohari_Loves_Log';
-const WEBSITE_URL = 'https://stkpetshop@gmail.vercel.app';
+const WELCOME_IMAGE_URL = process.env.TELEGRAM_WELCOME_IMAGE_URL || '';
+const SUPPORT_URL = process.env.TELEGRAM_SUPPORT_URL || 'https://t.me/';
+const DEVELOPER_URL = process.env.TELEGRAM_DEVELOPER_URL || 'https://t.me/';
+const WEBSITE_URL = process.env.TELEGRAM_WEBSITE_URL || 'https://example.com';
 
 if (!BOT_TOKEN || CHAT_IDS.length === 0) {
   console.warn('[startup] TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_IDS is missing. Set them in Render → Environment.');
