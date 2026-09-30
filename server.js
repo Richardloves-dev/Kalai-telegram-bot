@@ -73,6 +73,9 @@ function formatOrderMessage(order) {
     `📞 Phone: ${escapeHtml(customer.phone)}`,
     customer.whatsapp ? `💬 WhatsApp: ${escapeHtml(customer.whatsapp)}` : null,
     `📍 Address: ${escapeHtml(customer.address)}${customer.pincode ? ', ' + escapeHtml(customer.pincode) : ''}`,
+    (customer.coords && Number.isFinite(Number(customer.coords.lat)) && Number.isFinite(Number(customer.coords.lng)))
+      ? `📌 Coords : ${Number(customer.coords.lat)},${Number(customer.coords.lng)}`
+      : null,
     ``,
     `━━━━━━━━━━━━━━`,
     `📦 <b>ITEMS</b>`,
